@@ -1,0 +1,191 @@
+<link rel="import" href="../../polymer/polymer.html">
+<link rel="import" href="../../paper-button/paper-button.html">
+<link rel="import" href="../gamepad-service.html">
+
+<dom-module id="gamepad-tester">
+  <template>
+    <style>
+      paper-button {
+        width: 100px;
+        height: 34px;
+        margin-bottom: 4px;
+      }
+
+      paper-button.green {
+        background-color: var(--paper-green-500);
+        color: white;
+      }
+      paper-button.green[disabled] {
+        background-color: var(--paper-grey-500);
+      }
+
+      paper-button.red {
+        background-color: var(--paper-red-500);
+        color: white;
+      }
+
+      .gpname {
+        line-height: 34px;
+        height: 34px;
+        margin-left: 4px;
+        margin-right: 4px;
+        text-align: center;
+        font-weight: 400;
+        font-size: 15px;
+        color: var(--paper-grey-800);
+      }
+
+      .gpbutton {
+        display: inline-block;
+        line-height: 34px;
+        width: 34px;
+        height: 34px;
+        background: var(--paper-grey-800);
+        text-align: center;
+        font-weight: 400;
+        font-size: 15px;
+        color: white;
+        outline: none;
+      }
+
+      .gpaxes {
+        display: inline-block;
+        line-height: 34px;
+        width: 210px;
+        height: 34px;
+        background: var(--paper-grey-800);
+        text-align: center;
+        font-weight: 400;
+        font-size: 15px;
+        color: white;
+        outline: none;
+      }
+
+      .gphead {
+        display: inline-block;
+        line-height: 34px;
+        width: 100px;
+        height: 34px;
+        background: var(--paper-grey-800);
+        text-align: center;
+        font-weight: 400;
+        font-size: 15px;
+        color: white;
+        outline: none;
+        margin-left: 4px;
+      }
+
+      .pressed {
+        background-color: var(--paper-indigo-300);
+      }
+    </style>
+
+    <h2>GamepadAPI supported: {{gamepadSupported}}</h2><br>
+
+    <template is="dom-repeat" items="[[gamepadList]]">
+      <div>
+        <paper-button raised disabled="{{!item.available}}" class="green" on-click="connect">CONNECT</paper-button>
+        # <span>[[index]]</span>
+        <span class="gpname">ID: '[[item.id]]'</span>
+      </div>
+    </template>
+
+    <br>
+
+    <div hidden$="{{!gamepadConnected}}">
+      <paper-button class="red" on-click="disconnect"><span>DISCONNECT</span></paper-button>
+      <span class="gpname">'[[_renderGamepad(gamepadSelected)]]'</span>
+      <br><br>
+      <div class="gphead"><span>BUTTONS</span></div>
+      <template is="dom-repeat" items="[[gamepadButtons]]">
+        <div class$="gpbutton [[_isPressed(item)]]"><span>[[index]]</span></div>
+      </template>
+      <br><br>
+      <div class="gphead"><span>AXES</span></div>
+      <template is="dom-repeat" items="[[_getDirections(gamepadAxes)]]">
+        <div class="gpaxes"><span>[[index]] [[item]]</span></div>
+      </template>
+    </div>
+
+  </template>
+
+  <script>
+    Polymer({
+      is: 'gamepad-tester',
+      properties: {
+        renderTick: {
+          type: Number,
+          value: 0,
+          readonly: false,
+          notify: true
+        },
+        buttonColorStyle: {
+          type: String,
+          value: "black",
+          readonly: false,
+          notify: true
+        }
+      },
+
+      behaviors: [GamepadService],
+
+      connect: function(e) {
+        var model = e.model;
+        this.requestGamepad(model.index);
+        // start animation
+      },
+
+      disconnect: function() {
+        this.renderTick = 0;
+        this.releaseGamepad();
+        // stop animation
+      },
+
+      _arrayLimit: function(arr, limit) {
+        return arr.slice(0,limit);
+      },
+
+      _isPressed: function(btn) {
+        return btn ? "pressed" : "";
+      },
+
+      _getDirections: function(a) {
+        var result = [], str;
+        // TODO: Can we have an odd number of axes?
+        for(var i = 0; i<a.length;i+=2) {
+          str="";
+          if(a[i+1]>0.5) str += "SOUTH";
+          if(a[i+1]<-0.5) str += "NORTH";
+          if(a[i]>0.5) str += "EAST";
+          if(a[i]<-0.5) str += "WEST";
+          if(str.length === 0) {
+            str = "NEUTRAL";
+          }
+
+          str += " ("+a[i].toFixed(2)+","+a[i+1].toFixed(2)+")";
+          result.push(str);
+        }
+        return result;
+      },
+
+      _renderGamepad: function(gamepad) {
+        if(gamepad)
+          this.gameLoop();
+
+        return gamepad ? gamepad.id : "NONE";
+      },
+
+      gameLoop: function() {
+        if(!this.gamepadSelected)
+          return;
+
+        this.updateGamepadState();
+
+        requestAnimationFrame(this.gameLoop.bind(this));
+      }
+
+    });
+
+  </script>
+
+</dom-module>
