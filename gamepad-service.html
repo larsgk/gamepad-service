@@ -2,7 +2,6 @@
 
 <script>
 var listeners = [];
-var refcount = 0;
 var g_data = {};
 
 (function() {
@@ -16,16 +15,16 @@ var g_data = {};
     g_data.takenBy = {};
 
     window.addEventListener("gamepadconnected", function(e) {
-      console.log("Gamepad connected at index %d: %s. %d buttons, %d axes.",
-        e.gamepad.index, e.gamepad.id,
-        e.gamepad.buttons.length, e.gamepad.axes.length);
+      // console.log("Gamepad connected at index %d: %s. %d buttons, %d axes.",
+      //   e.gamepad.index, e.gamepad.id,
+      //   e.gamepad.buttons.length, e.gamepad.axes.length);
 
         g_data.gamepads[e.gamepad.index] = e.gamepad;
         _notifyGamepadListChange(e.gamepad.index, {index:e.gamepad.index, id:e.gamepad.id, connected:true, available:true, taken:false});
     });
 
     window.addEventListener("gamepaddisconnected", function(e) {
-       console.log("Gamepad disconnected at index %d.", e.gamepad.index);
+       // console.log("Gamepad disconnected at index %d.", e.gamepad.index);
 
         if(g_data.takenBy[e.gamepad.index]) {
             _releaseGamepad(g_data.takenBy[e.gamepad.index]);
@@ -169,21 +168,14 @@ GamepadService = {
     },
 
     registered: function() {
-        console.log("[Gamepad Service] registered");
         _initGamepadList()
     },
 
     attached: function() {
-        console.log("[Gamepad Service] attached", this);
-        refcount++;
-        console.log("REFCOUNT:", refcount);
         listeners.push(this);
     },
 
     detached: function() {
-        console.log("[Gamepad Service] detached", this);
-        refcount--;
-        console.log("REFCOUNT:", refcount);
         var i = listeners.indexOf(this);
         if (i >= 0) {
             listeners.splice(i, 1);
@@ -194,10 +186,7 @@ GamepadService = {
      * If the gamepad requestedis connected and not taken, 'this' instance will acquire/take it.
      */
     requestGamepad: function(idx) {
-        console.log(this, this.gamepadList);
-        var success = _requestGamepad(idx, this);
-        console.log("Grab gamepad %d: %s", idx, success ? "YEP :)" : "NOPE :(");
-        return success;
+        return _requestGamepad(idx, this);
     },
 
     /**
