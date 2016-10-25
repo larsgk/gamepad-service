@@ -1,0 +1,214 @@
+<link rel="import" href="../polymer/polymer.html">
+
+<script>
+var listeners = [];
+var g_data = {};
+
+(function() {
+    // Init gamepads
+    if(!!navigator.getGamepads) {
+        g_data.gamepads = navigator.getGamepads();
+    } else {
+        g_data.gamepads = {length:0};
+    }
+
+    g_data.takenBy = {};
+
+    window.addEventListener("gamepadconnected", _handleConnect);
+    window.addEventListener("gamepaddisconnected", e => _handleDisconnect(e.gamepad.index));
+
+}());
+
+function _handleConnect(e) {
+    g_data.gamepads[e.gamepad.index] = e.gamepad;
+    _notifyGamepadListChange(e.gamepad.index, {index:e.gamepad.index, id:e.gamepad.id, connected:true, available:true, taken:false});
+}
+
+function _handleDisconnect(index) {
+    if(g_data.takenBy[index]) {
+        _releaseGamepad(g_data.takenBy[index]);
+    }
+
+    g_data.gamepads[index] = undefined;
+    _notifyGamepadListChange(index, {index:index, id:"N/A", connected:false, available:false, taken:false});
+
+}
+
+function _notifyGamepadListChange(index, data) {
+    listeners.forEach( function(instance) {
+        instance.notifyPath('gamepadList.'+index, data)
+    });
+}
+
+function _initGamepadList() {
+    var arr = [];
+    for(let idx = 0; idx < g_data.gamepads.length; idx++) {
+        let gamepad = g_data.gamepads[idx];
+
+        arr.push(gamepad ? {index: idx, id:gamepad.id, connected:true, available:true, taken:false} :
+            {index: idx, id:"N/A", connected:false, available:false, taken:false});
+    }
+    GamepadService.properties.gamepadList.value = arr;
+}
+
+function _requestGamepad(idx, instance) {
+    if(!g_data.gamepads[idx] || !!g_data.takenBy[idx]) {
+        return false;
+    }
+
+    g_data.takenBy[idx] = instance;
+    instance.set('gamepadSelected', {id:g_data.gamepads[idx].id, index:idx});
+    instance.set('gamepadConnected', true);
+
+    listeners.forEach( inst => {
+        inst.set('gamepadList.'+idx+'.taken', true);
+        inst.set('gamepadList.'+idx+'.available', false);
+    });
+
+    return true;
+}
+
+function _releaseGamepad(instance) {
+    if(!instance.gamepadSelected)
+        return;
+
+    let idx = instance.gamepadSelected.index;
+    if(g_data.takenBy[idx] === instance) {
+        delete g_data.takenBy[idx];
+    }
+
+    instance.set('gamepadSelected');
+    instance.set('gamepadConnected', false);
+
+    listeners.forEach( inst => {
+        inst.set('gamepadList.'+idx+'.taken', false);
+        inst.set('gamepadList.'+idx+'.available', true);
+    });
+}
+
+/**
+ * `GamepadService` is a polymer behavior providing a service for multi-player access to the GamepadAPI
+ *
+ * Key features:
+ *
+ * * A service (behavior with singleton parts) to manage available ports, which are taken by (other) components, etc.
+ * * Elements using the service (behavior) can request/release a connected gamepad
+ * * Helpers to put gamepad state data in normalized instance structures (gamepadButtons & gamepadAxes)
+ *
+ *
+ * @demo demo/index.html
+ * @polymerBehavior
+ */
+GamepadService = {
+    properties: {
+        /**
+         * True = the GamepadAPI is supported.
+         */
+        gamepadSupported: {
+            type: Boolean,
+            value: !!navigator.getGamepads,
+            readonly: true
+        },
+
+        /**
+         * Shared updated list of simplified gamepad objects.
+         * Each object contains the following properties:
+         * * index: the index in the GamepadAPI list
+         * * id: the displayed identifier string
+         * * connected: (true = the gamepad is connected to the system)
+         * * available: (true = available for an instance to request)
+         * * taken: (true = the gamepad is currently taken by an instance)
+         */
+        gamepadList: {
+            type: Array,
+            value: [],
+            readonly: false
+        },
+
+        /**
+         * Gamepad currently taken by 'this' element.
+         */
+        gamepadSelected: {
+            type: Object,
+            value: undefined,
+            readonly: false
+        },
+
+        /**
+         * Array of all axes (in order) data from the connected gamepad [-1;1].
+         */
+        gamepadAxes: {
+            type: Array,
+            value: [],
+            readonly: false,
+            notify: true
+        },
+
+        /**
+         * Boolean array (true = button pressed) of all buttons in order.
+         */
+        gamepadButtons: {
+            type: Array,
+            value: [],
+            readonly: false,
+            notify: true
+        },
+
+        /**
+         * True if the instance element has connected to (taken) a gamepad.
+         */
+        gamepadConnected: {
+            type: Boolean,
+            value: false,
+            readonly: false,
+            notify: true
+        },
+    },
+
+    registered: function() {
+        _initGamepadList()
+    },
+
+    attached: function() {
+        listeners.push(this);
+    },
+
+    detached: function() {
+        var i = listeners.indexOf(this);
+        if (i >= 0) {
+            listeners.splice(i, 1);
+        }
+    },
+
+    /**
+     * If the gamepad requestedis connected and not taken, 'this' instance will acquire/take it.
+     */
+    requestGamepad: function(index) {
+        return _requestGamepad(index, this);
+    },
+
+    /**
+     * The instance ('this' element) will release a taken gamepad back to the pool.
+     */
+    releaseGamepad: function() {
+        _releaseGamepad(this);
+    },
+
+    /**
+     * Call this to update gamepadButtons and gamepadAxes for all instances (e.g. from a requestAnimationFrame game loop).
+     */
+    updateGamepadState: function() {
+        var gps = navigator.getGamepads();
+        for(let i=0;i<gps.length;i++) {
+            let instance = g_data.takenBy[i];
+            if(gps[i] && instance && instance.gamepadSelected) {
+                instance.gamepadAxes = gps[i].axes;
+                instance.gamepadButtons = gps[i].buttons.map(val => typeof(val) == "object" ? val.pressed : val == 1.0);
+            } else if(instance && !gps[i]) { // Fallback for windows (doesn't seem to report disconnect)
+                _handleDisconnect(i);
+            }
+        }
+    }
+};
+</script>
+

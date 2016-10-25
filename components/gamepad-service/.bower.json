@@ -1,0 +1,25 @@
+{
+  "name": "gamepad-service",
+  "description": "Polymer service (behavior) encapsulating GamepadAPI with multi-player support.",
+  "main": "gamepad-service.html",
+  "dependencies": {
+    "polymer": "Polymer/polymer#^1.7.0",
+    "paper-fab": "PolymerElements/paper-fab#^1.2.0"
+  },
+  "devDependencies": {
+    "iron-component-page": "PolymerElements/iron-component-page#^1.0.0",
+    "iron-demo-helpers": "PolymerElements/iron-demo-helpers#^1.0.0",
+    "web-component-tester": "^4.0.0"
+  },
+  "homepage": "https://github.com/larsgk/gamepad-service",
+  "_release": "c7aed2310e",
+  "_resolution": {
+    "type": "branch",
+    "branch": "master",
+    "commit": "c7aed2310e7cbe8e459fc44db1e424a4255655f0"
+  },
+  "_source": "git://github.com/larsgk/gamepad-service.git",
+  "_target": "master",
+  "_originalSource": "larsgk/gamepad-service",
+  "_direct": true
+}
