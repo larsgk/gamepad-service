@@ -14,27 +14,25 @@ var g_data = {};
 
     g_data.takenBy = {};
 
-    window.addEventListener("gamepadconnected", function(e) {
-      // console.log("Gamepad connected at index %d: %s. %d buttons, %d axes.",
-      //   e.gamepad.index, e.gamepad.id,
-      //   e.gamepad.buttons.length, e.gamepad.axes.length);
-
-        g_data.gamepads[e.gamepad.index] = e.gamepad;
-        _notifyGamepadListChange(e.gamepad.index, {index:e.gamepad.index, id:e.gamepad.id, connected:true, available:true, taken:false});
-    });
-
-    window.addEventListener("gamepaddisconnected", function(e) {
-       // console.log("Gamepad disconnected at index %d.", e.gamepad.index);
-
-        if(g_data.takenBy[e.gamepad.index]) {
-            _releaseGamepad(g_data.takenBy[e.gamepad.index]);
-        }
-
-        g_data.gamepads[e.gamepad.index] = undefined;
-        _notifyGamepadListChange(e.gamepad.index, {index:e.gamepad.index, id:"N/A", connected:false, available:false, taken:false});
-    });
+    window.addEventListener("gamepadconnected", _handleConnect);
+    window.addEventListener("gamepaddisconnected", e => _handleDisconnect(e.gamepad.index));
 
 }());
+
+function _handleConnect(e) {
+    g_data.gamepads[e.gamepad.index] = e.gamepad;
+    _notifyGamepadListChange(e.gamepad.index, {index:e.gamepad.index, id:e.gamepad.id, connected:true, available:true, taken:false});
+}
+
+function _handleDisconnect(index) {
+    if(g_data.takenBy[index]) {
+        _releaseGamepad(g_data.takenBy[index]);
+    }
+
+    g_data.gamepads[index] = undefined;
+    _notifyGamepadListChange(index, {index:index, id:"N/A", connected:false, available:false, taken:false});
+
+}
 
 function _notifyGamepadListChange(index, data) {
     listeners.forEach( function(instance) {
@@ -62,7 +60,7 @@ function _requestGamepad(idx, instance) {
     instance.set('gamepadSelected', {id:g_data.gamepads[idx].id, index:idx});
     instance.set('gamepadConnected', true);
 
-    listeners.forEach( function(inst) {
+    listeners.forEach( inst => {
         inst.set('gamepadList.'+idx+'.taken', true);
         inst.set('gamepadList.'+idx+'.available', false);
     });
@@ -82,7 +80,7 @@ function _releaseGamepad(instance) {
     instance.set('gamepadSelected');
     instance.set('gamepadConnected', false);
 
-    listeners.forEach( function(inst) {
+    listeners.forEach( inst => {
         inst.set('gamepadList.'+idx+'.taken', false);
         inst.set('gamepadList.'+idx+'.available', true);
     });
@@ -185,8 +183,8 @@ GamepadService = {
     /**
      * If the gamepad requestedis connected and not taken, 'this' instance will acquire/take it.
      */
-    requestGamepad: function(idx) {
-        return _requestGamepad(idx, this);
+    requestGamepad: function(index) {
+        return _requestGamepad(index, this);
     },
 
     /**
@@ -197,18 +195,19 @@ GamepadService = {
     },
 
     /**
-     * Call this to update gamepadButtons and gamepadAxes (e.g. from a requestAnimationFrame game loop).
+     * Call this to update gamepadButtons and gamepadAxes for all instances (e.g. from a requestAnimationFrame game loop).
      */
     updateGamepadState: function() {
-        if(!this.gamepadSelected)
-            return;
-
-        var gp = navigator.getGamepads()[this.gamepadSelected.index];
-        if(!gp)
-            return;
-
-        this.gamepadAxes = gp.axes;
-        this.gamepadButtons = gp.buttons.map(val => typeof(val) == "object" ? val.pressed : val == 1.0);
+        var gps = navigator.getGamepads();
+        for(let i=0;i<gps.length;i++) {
+            let instance = g_data.takenBy[i];
+            if(gps[i] && instance && instance.gamepadSelected) {
+                instance.gamepadAxes = gps[i].axes;
+                instance.gamepadButtons = gps[i].buttons.map(val => typeof(val) == "object" ? val.pressed : val == 1.0);
+            } else if(instance && !gps[i]) { // Fallback for windows (doesn't seem to report disconnect)
+                _handleDisconnect(i);
+            }
+        }
     }
 };
 </script>
